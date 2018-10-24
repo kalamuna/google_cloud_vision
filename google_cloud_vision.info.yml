@@ -1,0 +1,8 @@
+name: Google Cloud Vision
+description: Provides Drupal integration with Google Cloud Vision.
+package: Google Cloud
+type: module
+core: 8.x
+dependencies:
+  - drupal:lockr
+configure: google_cloud_vision.settings

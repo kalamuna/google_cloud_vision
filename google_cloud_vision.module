@@ -1,0 +1,170 @@
+<?php
+
+/**
+ * @file
+ * Contains google_cloud_vision.module.
+ */
+
+use Drupal\Core\Form\FormStateInterface;
+use Drupal\Core\Routing\RouteMatchInterface;
+use Drupal\file\FileInterface;
+use Google\Cloud\Vision\VisionClient;
+
+/**
+ * Implements hook_help().
+ */
+function google_cloud_vision_help($route_name, RouteMatchInterface $route_match) {
+  switch ($route_name) {
+    // Main module help for the google_cloud_vision module.
+    case 'help.page.google_cloud_vision':
+      $output = '';
+      $output .= '<h3>' . t('About') . '</h3>';
+      $output .= '<p>' . t('Google Cloud Vision API') . '</p>';
+      return $output;
+
+    default:
+  }
+}
+
+/**
+ * Implements hook_theme().
+ */
+function google_cloud_vision_theme() {
+  return [
+    'google_cloud_vision_demo' => [
+      'render element' => 'children',
+      'variables' => [
+        'image' => NULL,
+        'faces' => [],
+        'fulltext' => NULL,
+        'image_props' => NULL,
+        'labels' => [],
+        'landmarks' => NULL,
+        'logos' => NULL,
+        'safe_search' => [],
+        'text' => NULL,
+        'web' => NULL,
+      ],
+    ],
+    'google_cloud_image_file_field' => [
+      'variables' => [
+        'input_name' => '',
+        'label' => '',
+      ],
+      'template' => 'google-cloud-vision-file-field',
+    ],
+  ];
+}
+
+/**
+ * Implements hook_field_widget_form_alter().
+ *
+ * Adds Google Vision API checks on the file uploads.
+ *
+ * @see https://api.drupal.org/api/drupal/core%21modules%21field%21field.api.php/function/hook_field_widget_form_alter/8.6.x
+ */
+function google_cloud_vision_field_widget_form_alter(&$element, FormStateInterface $form_state, $context) {
+  $field_definition = $context['items']->getFieldDefinition();
+  if (!in_array($field_definition->getType(), ['image'])) {
+    return;
+  }
+  $element['#upload_validators']['google_cloud_vision_validate_file'] = [];
+}
+
+/**
+ * File Upload Callback; Validates the given File against Google Vision API.
+ *
+ * @see google_cloud_vision_field_widget_form_alter()
+ */
+function google_cloud_vision_validate_file(FileInterface $file) {
+  $errors = [];
+
+  // Retrieve the file path.
+  $filepath = $file->getFileUri();
+  $result = google_cloud_vision_image_safesearch($filepath);
+
+  // Check the results.
+  if ($result !== TRUE) {
+    $errors = $result;
+  }
+
+  return $errors;
+}
+
+/**
+ * Validates the given file URI against Google Vision API.
+ *
+ * @return bool|array
+ *   TRUE if safe, an invalid conditions array otherwise.
+ */
+function google_cloud_vision_image_safesearch($uri) {
+  $key_name = \Drupal::config('google_cloud_vision.settings')->get('key');
+  $key = json_decode(\Drupal::service('key.repository')->getKey($key_name)->getKeyValue(), TRUE);
+  $project_id = \Drupal::config('google_cloud_vision.settings')->get('project_id');
+  try {
+    // Create the Vision Client API.
+    $vision = new VisionClient([
+      // Name of the project.
+      'projectId' => $project_id,
+
+      // Authentication Key.
+      // This is a JSON download from a Service Account
+      // https://console.cloud.google.com/iam-admin/serviceaccounts
+      'keyFile' => $key,
+    ]);
+  }
+  catch (\Exception $e) {
+    return [$e->getMessage()];
+  }
+  $imageData = fopen($uri, 'r');
+
+  // Tell Google Vision what we want to process.
+  $image = $vision->image($imageData, [
+    // @codingStandardsIgnoreStart
+    // 'FACE_DETECTION',
+    // 'LANDMARK_DETECTION',
+    // 'LOGO_DETECTION',
+    // 'LABEL_DETECTION',
+    // 'TEXT_DETECTION',
+    // 'DOCUMENT_TEXT_DETECTION',
+    'SAFE_SEARCH_DETECTION',
+    // 'IMAGE_PROPERTIES',
+    // 'WEB_DETECTION',
+    // @codingStandardsIgnoreEnd
+  ]);
+
+  // Process image with Google Vision.
+  $annotation = $vision->annotate($image);
+
+  // Process errors.
+  $error = $annotation->error();
+  if (!is_null($error)) {
+    $result = [];
+    $result[] = print_r($error, TRUE);
+    return $result;
+  }
+
+  // Parse safe search properties.
+  $safe_search = $annotation->safeSearch();
+  $safe_search_props = [
+    'isAdult' => t('Adult Content'),
+    'isMedical' => t('Medical Content'),
+    // @codingStandardsIgnoreStart
+    // 'isSpoof' => t('Possible Spoofed Content'),
+    // @codingStandardsIgnoreEnd
+    'isViolent' => t('Violent Content'),
+    'isRacy' => t('Racy Content'),
+  ];
+  $results = [];
+  foreach ($safe_search_props as $property => $description) {
+    // Only repond to high strength probabilities.
+    if ($safe_search->$property('high')) {
+      $results[] = $description;
+    }
+  }
+  if (!empty($results)) {
+    return $results;
+  }
+
+  return TRUE;
+}

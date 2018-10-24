@@ -1,0 +1,15 @@
+google_cloud_vision.vision_controller_demo:
+  path: '/google-cloud-vision/demo'
+  defaults:
+    _controller: '\Drupal\google_cloud_vision\Controller\GoogleCloudVisionController::demo'
+    _title: 'Google Cloud Vision Demo'
+  requirements:
+    _permission: 'administer site configuration'
+
+google_cloud_vision.settings:
+  path: '/admin/config/google-cloud-vision/settings'
+  defaults:
+    _form: '\Drupal\google_cloud_vision\Form\GoogleCloudVisionSettingsForm'
+    _title: 'Google Cloud Vision'
+  requirements:
+    _permission: 'administer site configuration'

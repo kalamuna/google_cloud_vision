@@ -1,0 +1,9 @@
+{
+    "name": "kalamuna/google_cloud_vision",
+    "description": "Google Cloud Vision integration with Drupal",
+    "type": "drupal-module",
+    "license": "GPL-2.0-or-later",
+    "require": {
+        "google/cloud-vision": "^0.17.1"
+    }
+}
