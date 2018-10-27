@@ -4,8 +4,7 @@
 
 ## Features
 
-- Ensures images uploaded with image fields do not contain adult content
-- Avoids saving potentially dangerous files locally
+- Ensures uploaded images uploaded with image fields do not contain adult content
 - Saves Google Vision Keys safely through [Lockr](https://www.drupal.org/project/lockr)
 
 ## Dependencies
